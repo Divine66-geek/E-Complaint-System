@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { default as firebaseAdmin } from "../config/firebase.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAdmin, requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 const DEPARTMENTS = [
@@ -9,9 +9,11 @@ const DEPARTMENTS = [
   "Electricity & Energy Services",
   "Waste Management",
   "Sanitation Services",
+  "Infrastructure & Planning",
+  "General Complaints Office",
 ];
 
-router.post("/department-registration", requireAuth, async (req, res, next) => {
+router.post("/department-registration", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const { department } = req.body || {};
     if (!DEPARTMENTS.includes(department)) {

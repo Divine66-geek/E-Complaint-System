@@ -40,3 +40,11 @@ export function requireOfficer(req, res, next) {
   req.department = req.user?.department || req.user?.claims?.department || null;
   next();
 }
+
+export function requireAdmin(req, res, next) {
+  const role = req.user?.role || req.user?.claims?.role;
+  if (role !== "admin") {
+    return res.status(403).json({ error: "Administrator access required" });
+  }
+  next();
+}

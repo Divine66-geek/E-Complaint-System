@@ -6,3 +6,6 @@ scikit-learn==1.5.1
 numpy==1.26.4
 tensorflow==2.16.1
 deep-translator==1.11.4
+Pillow==10.4.0
+transformers==4.46.3
+torch==2.5.1

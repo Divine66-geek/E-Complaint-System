@@ -34,19 +34,41 @@ export default function ResidentPortal({ user, onSignIn }) {
     refreshMine();
   }, [user]);
 
-  async function handleSubmit(text, area, language, coordinates) {
+  async function handleSubmit(text, area, language, coordinates, image) {
     setSubmitting(true);
     setError("");
     setLatest(null);
     try {
-      const complaint = await api.submitComplaint(text, area, language, coordinates);
+      const complaint = await api.submitComplaint(text, area, language, coordinates, image);
       addMyTrackingId(complaint.id);
       setLatest(complaint);
       refreshMine();
     } catch (err) {
-      setError(err.response?.data?.error || "Couldn't reach the AI service — please try again.");
+      const status = err.response?.status;
+      const message = err.response?.data?.error;
+      if (status === 401) {
+        setError("Your session has expired. Please sign in again before sending this report.");
+      } else if (status === 413) {
+        setError("That photo is too large. Please choose an image under 10 MB.");
+      } else if (message) {
+        setError(`Your report could not be sent: ${message}`);
+      } else {
+        setError("We could not send your report. Check that the backend is running, then try again.");
+      }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleImageAnalyze(image, description = "") {
+    try {
+      return await api.analyzeImage(image, description);
+    } catch (err) {
+      const message = err.response?.status === 413
+        ? "That photo is too large. Please choose an image under 10 MB."
+        : err.response?.data?.error || "We couldn't analyse that photo yet.";
+      setError(message);
+      return null;
     }
   }
 
@@ -66,29 +88,19 @@ export default function ResidentPortal({ user, onSignIn }) {
     <div className="resident-page">
       <div className="page-intro resident-intro">
         <div>
-          <div className="eyebrow">Resident desk / Make your voice count</div>
-          <h2 className="section-title">A report should lead somewhere.</h2>
-          <p className="section-copy">Tell us what is happening in plain language. E-Complaint System finds the right team, marks urgency, and gives you a number to follow.</p>
+          <h2 className="section-title">Report a civic issue.</h2>
         </div>
-        <div className="intro-aside"><span className="intro-number">01</span><span>Describe<br />the issue</span></div>
       </div>
 
       <div className="resident-layout">
         <div>
-          <ComplaintForm onSubmit={handleSubmit} submitting={submitting} />
+          <ComplaintForm onSubmit={handleSubmit} onImageAnalyze={handleImageAnalyze} submitting={submitting} />
           {error && <div className="error-banner" role="alert"><span aria-hidden="true">!</span>{error}</div>}
           {latest && <><AnalysisCard complaint={latest} /><div className="success-banner" role="status"><span aria-hidden="true">✓</span><div><strong>Report received successfully.</strong><br />Tracking number: {latest.id}{latest.notification?.emailSent ? ` · Confirmation sent to ${latest.reporterEmail || user?.email}.` : user ? " · Your report is saved. Email delivery is not configured yet." : " · Sign in before submitting to receive email updates."}</div></div></>}
           <Tracker complaints={mine} onConfirm={handleConfirm} confirming={confirming} />
         </div>
-
-        <aside className="service-rail">
-          <div className="rail-label">What happens next</div>
-          <div className="process-step active"><span>01</span><div><strong>We read your report</strong><p>AI picks up the issue, location clues, and urgency.</p></div></div>
-          <div className="process-step"><span>02</span><div><strong>It reaches the right team</strong><p>Your report is routed with a clear priority and department.</p></div></div>
-          <div className="process-step"><span>03</span><div><strong>You stay in the loop</strong><p>Use your tracking number to see progress and confirm the fix.</p></div></div>
-          <div className="rail-note"><span aria-hidden="true">✦</span><div><strong>{user ? `Signed in as ${user.email}` : "Good to know"}</strong><p>{user ? "Your verified account email will receive E-Complaint System updates." : "You can report anonymously. Sign in before submitting if you want email confirmations."}{!user && <button type="button" className="inline-link" onClick={onSignIn}>Sign in now</button>}</p></div></div>
-        </aside>
       </div>
     </div>
   );
 }
+

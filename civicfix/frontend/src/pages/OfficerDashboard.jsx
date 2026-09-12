@@ -22,8 +22,18 @@ export default function OfficerDashboard({ user, onSignOut }) {
       setComplaints(list);
       setSummary(stats);
       setLastUpdated(new Date());
-    } catch {
-      setError("The operations feed is unavailable. Check that the backend is running, then refresh.");
+    } catch (err) {
+      const status = err.response?.status;
+      const message = err.response?.data?.error;
+      if (status === 401) {
+        setError("Your officer session has expired. Sign out and sign in again.");
+      } else if (status === 403) {
+        setError("This account does not have department access. Sign in with an authorised officer account.");
+      } else if (message) {
+        setError(`The operations feed could not load: ${message}`);
+      } else {
+        setError("The operations feed is unavailable. Check that the backend is running, then refresh.");
+      }
     } finally {
       setLoading(false);
     }

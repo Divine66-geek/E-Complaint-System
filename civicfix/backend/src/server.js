@@ -16,11 +16,12 @@ const configuredOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173")
   .filter(Boolean);
 const allowedOrigins = process.env.NODE_ENV === "production"
   ? configuredOrigins
-  : [...new Set([...configuredOrigins, "http://localhost:5173", "http://localhost:5174"])]
+  : [...new Set([...configuredOrigins, "http://localhost:5173", "http://localhost:5174", "http://localhost:5176", "http://localhost:5177"])]
 
 app.use(helmet());
 app.use(cors({ origin: allowedOrigins, credentials: true }));
-app.use(express.json({ limit: "32kb" }));
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: "draft-7", legacyHeaders: false }));

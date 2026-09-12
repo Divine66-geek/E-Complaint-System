@@ -53,6 +53,21 @@ export default function AnalysisCard({ complaint }) {
           />
         </div>
 
+        {complaint.imageAnalysis && (
+          <div className="priority-reason photo-analysis-panel">
+            <span>AI detected issue from photo</span>
+            <div className="photo-analysis-details">
+              <strong>{complaint.imageAnalysis.generated_issue || complaint.imageAnalysis.summary}</strong>
+              <div><b>Category:</b> {complaint.imageAnalysis.category}</div>
+              <div><b>Detected text:</b> {complaint.imageAnalysis.ocr_text || complaint.imageAnalysis.issue_text}</div>
+              {complaint.imageAnalysis.keywords?.length > 0 && (
+                <div><b>Keywords:</b> {complaint.imageAnalysis.keywords.join(', ')}</div>
+              )}
+              <div><b>Priority:</b> {complaint.imageAnalysis.priority}</div>
+            </div>
+          </div>
+        )}
+
         {complaint.priorityReason && (
           <div className="priority-reason">
             <span>Why this priority</span>

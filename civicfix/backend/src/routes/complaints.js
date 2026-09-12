@@ -2,9 +2,9 @@ import { Router } from "express";
 import { randomBytes } from "node:crypto";
 import rateLimit from "express-rate-limit";
 import { db } from "../config/firebase.js";
-import { classify, checkDuplicate } from "../services/aiServiceClient.js";
+import { classify, checkDuplicate, analyzeImage } from "../services/aiServiceClient.js";
 import { notify } from "../services/notificationService.js";
-import { requireAuth, requireOfficer } from "../middleware/auth.js";
+import { optionalAuth, requireAuth, requireOfficer } from "../middleware/auth.js";
 
 const router = Router();
 const submitLimiter = rateLimit({
@@ -20,6 +20,26 @@ function genTrackingId() {
   return `CF${randomBytes(6).toString("hex").toUpperCase()}`;
 }
 
+router.post("/analyze-image", optionalAuth, async (req, res, next) => {
+  try {
+    const image = req.body?.image;
+    const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
+    if (!image?.dataUrl) return res.status(400).json({ error: "image is required" });
+
+    const result = await analyzeImage(image, description);
+    const keywords = Array.isArray(result?.keywords) ? result.keywords : [];
+    const reportText = [description, result?.issue_text, keywords.join(", ")].filter(Boolean).join(". ");
+
+    res.json({
+      ...result,
+      keywords,
+      report_text: reportText,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/complaints — resident submits a new report
 router.post("/", submitLimiter, requireAuth, async (req, res, next) => {
   try {
@@ -27,7 +47,8 @@ router.post("/", submitLimiter, requireAuth, async (req, res, next) => {
     const areaHint = typeof req.body?.area === "string" ? req.body.area.trim() : "";
     const language = typeof req.body?.language === "string" ? req.body.language.trim().toLowerCase() : "en";
     const coordinates = req.body?.coordinates;
-    if (!text) return res.status(400).json({ error: "text is required" });
+    const image = req.body?.image;
+    if (!text && !image?.dataUrl) return res.status(400).json({ error: "text or image is required" });
     if (text.length > 800) return res.status(400).json({ error: "text must be 800 characters or fewer" });
     if (areaHint.length > 160) return res.status(400).json({ error: "area must be 160 characters or fewer" });
     if (!SUPPORTED_LANGUAGES.has(language)) return res.status(400).json({ error: "unsupported report language" });
@@ -45,8 +66,11 @@ router.post("/", submitLimiter, requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: "text and area must be strings" });
     }
 
+    const imageSummary = image?.dataUrl ? await analyzeImage(image, text) : null;
+    const combinedText = [text, imageSummary?.issue_text, imageSummary?.summary].filter(Boolean).join(" ").trim();
+
     // 1. Classification service
-    const classification = await classify(text, language);
+    const classification = await classify(combinedText || text, language);
     const area = areaHint || classification.area;
 
     // 2. Fetch open reports in the same category for duplicate comparison
@@ -89,6 +113,14 @@ router.post("/", submitLimiter, requireAuth, async (req, res, next) => {
       reporterUid: req.user?.uid || null,
       language,
       coordinates: coordinates || null,
+      image: image ? { name: image.name, type: image.type, dataUrl: image.dataUrl } : null,
+      imageAnalysis: imageSummary ? {
+        summary: imageSummary.summary,
+        category: imageSummary.category,
+        issue_text: imageSummary.issue_text,
+        priority: imageSummary.priority,
+        confidence: imageSummary.confidence,
+      } : null,
     };
 
     await db.collection("complaints").doc(id).set(complaint);

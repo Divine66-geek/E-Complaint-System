@@ -18,8 +18,19 @@ client.interceptors.request.use(async (config) => {
 });
 
 export const api = {
-  submitComplaint: (text, area, language, coordinates) =>
-    client.post("/complaints", { text, area, language, coordinates }).then((r) => r.data),
+  submitComplaint: (text, area, language, coordinates, image) =>
+    client.post("/complaints", {
+      text,
+      area,
+      language,
+      coordinates,
+      image: image ? { name: image.name, type: image.type, dataUrl: image.dataUrl } : null,
+    }).then((r) => r.data),
+  analyzeImage: (image, description = "") =>
+    client.post("/complaints/analyze-image", {
+      image: image ? { name: image.name, type: image.type, dataUrl: image.dataUrl } : null,
+      description,
+    }).then((r) => r.data),
   listMyComplaints: () => client.get("/complaints/mine").then((r) => r.data),
   listComplaints: () => client.get("/complaints").then((r) => r.data),
   getComplaint: (id) => client.get(`/complaints/${id}`).then((r) => r.data),

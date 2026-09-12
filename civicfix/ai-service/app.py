@@ -7,6 +7,7 @@ from flask_cors import CORS
 
 from nlp.classifier import ComplaintClassifier
 from nlp.duplication import find_duplicate
+from nlp.image_model import analyze_image_content
 
 app = Flask(__name__)
 CORS(app)
@@ -43,6 +44,21 @@ def check_duplicate():
 
     match = find_duplicate(text, candidates)
     return jsonify(match or {"duplicate_of": None, "similarity": None})
+
+
+@app.route("/analyze-image", methods=["POST"])
+def analyze_image():
+    body = request.get_json(force=True) or {}
+    image_data = body.get("image_data_url") or body.get("image") or ""
+    description = (body.get("description") or "").strip()
+    if not image_data:
+        return jsonify({"error": "image is required"}), 400
+
+    result = analyze_image_content(image_data, description)
+    return jsonify({
+        **result,
+        "report_text": result.get("generated_issue", result.get("summary", "")) + (f" Keywords: {', '.join(result.get('keywords', []))}" if result.get('keywords') else ""),
+    })
 
 
 if __name__ == "__main__":
