@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import ResidentPortal from "./pages/ResidentPortal.jsx";
 import OfficerDashboard from "./pages/OfficerDashboard.jsx";
 import UserLogin from "./components/UserLogin.jsx";
-import { authConfigured, clearStoredUser, getStoredUser, register, signIn as firebaseSignIn } from "./auth.js";
+import { authConfigured, clearStoredUser, getStoredUser, register, registerOfficer, signIn } from "./auth.js";
 import { setAuthUser } from "./api.js";
 
 export default function App() {
@@ -23,10 +23,28 @@ export default function App() {
     setAuthUser(user);
   }, [user]);
 
-  async function authenticate(email, password, mode = "signin", role = view) {
+  async function authenticate(email, password, mode = "signin", role = view, department) {
     setAuthError("");
+    if (!authConfigured) {
+      const demoRole = role === "officer" ? "officer" : "resident";
+      const demoUser = {
+        email: email || (demoRole === "officer" ? "officer@civicfix.local" : "resident@civicfix.local"),
+        role: demoRole,
+        department: demoRole === "officer" ? "General Complaints Office" : null,
+        idToken: `local-demo-${demoRole}-token`,
+        refreshToken: `local-demo-${demoRole}-token`,
+        getIdToken: async () => `local-demo-${demoRole}-token`,
+      };
+      setUser(demoUser);
+      setAuthUser(demoUser);
+      if (demoRole === "resident") setResidentLogin(false);
+      return;
+    }
+
     try {
-      const nextUser = mode === "register" ? await register(email, password) : await firebaseSignIn(email, password);
+      const nextUser = mode === "register"
+        ? role === "officer" ? await registerOfficer(email, password, department) : await register(email, password)
+        : await signIn(email, password);
       if (role === "officer" && !["officer", "admin"].includes(nextUser.role)) {
         clearStoredUser();
         throw new Error("Officer access required");
@@ -85,7 +103,7 @@ export default function App() {
       </header>
 
       <main className="main-content">
-        {showWelcome ? <WelcomePage onResident={() => { setView("resident"); setResidentLogin(true); setShowWelcome(false); }} onOfficer={() => { setView("officer"); setShowWelcome(false); }} /> : view === "resident" ? residentLogin ? <UserLogin role="resident" configured={authConfigured} onSubmit={(email, password, mode) => authenticate(email, password, mode, "resident")} error={authError} /> : <ResidentPortal user={user} onSignIn={() => setResidentLogin(true)} /> : isOfficer ? <OfficerDashboard user={user} onSignOut={signOut} /> : <UserLogin role="officer" configured={authConfigured} onSubmit={(email, password, mode) => authenticate(email, password, mode, "officer")} error={authError} />}
+        {showWelcome ? <WelcomePage onResident={() => { setView("resident"); setResidentLogin(true); setShowWelcome(false); }} onOfficer={() => { setView("officer"); setShowWelcome(false); }} /> : view === "resident" ? residentLogin ? <UserLogin role="resident" configured={authConfigured} onSubmit={(email, password, mode) => authenticate(email, password, mode, "resident")} error={authError} /> : <ResidentPortal user={user} onSignIn={() => setResidentLogin(true)} /> : isOfficer ? <OfficerDashboard user={user} onSignOut={signOut} /> : <UserLogin role="officer" configured={authConfigured} onSubmit={(email, password, mode, department) => authenticate(email, password, mode, "officer", department)} error={authError} />}
       </main>
     </div>
   );

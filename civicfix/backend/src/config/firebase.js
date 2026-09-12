@@ -1,11 +1,15 @@
 import admin from "firebase-admin";
 import fs from "fs";
 import { createMemoryDb } from "./memoryDb.js";
+import { createSqliteDb } from "./sqliteDb.js";
 
 let db;
 let firebaseAdmin = null;
 
-if (process.env.CIVICFIX_STORAGE === "memory") {
+if (process.env.CIVICFIX_STORAGE === "sqlite") {
+  console.warn("E-Complaint System storage: SQLite database");
+  db = createSqliteDb();
+} else if (process.env.CIVICFIX_STORAGE === "memory") {
   console.warn("E-Complaint System storage: in-memory development mode (data resets on restart)");
   db = createMemoryDb();
 } else {

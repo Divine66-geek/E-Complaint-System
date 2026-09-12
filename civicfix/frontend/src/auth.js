@@ -1,5 +1,6 @@
 const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
-export const authConfigured = Boolean(apiKey);
+const localDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
+export const authConfigured = true;
 const AUTH_ENDPOINT = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey || "missing"}`;
 const REGISTER_ENDPOINT = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey || "missing"}`;
 const SESSION_KEY = "civicfix:auth-session";
@@ -49,11 +50,44 @@ async function refreshSession(idToken, refreshToken) {
 }
 
 export function signIn(email, password) {
-  return authenticate(AUTH_ENDPOINT, email, password);
+  return authenticateDatabase("/login", email, password);
 }
 
 export function register(email, password) {
-  return authenticate(REGISTER_ENDPOINT, email, password);
+  return authenticateDatabase("/register", email, password);
+}
+
+export function registerOfficer(email, password, department) {
+  return authenticateDatabase("/register-officer", email, password, { department });
+}
+
+async function authenticateDatabase(path, email, password, extra = {}) {
+  const response = await fetch(`${API_URL}/auth${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, ...extra }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(body.error || "Unable to authenticate");
+    error.code = body.error || "AUTH_FAILED";
+    throw error;
+  }
+
+  const user = {
+    ...body.user,
+    idToken: body.token,
+    refreshToken: body.token,
+    getIdToken: async () => body.token,
+  };
+  localStorage.setItem(SESSION_KEY, JSON.stringify({
+    email: user.email,
+    idToken: user.idToken,
+    refreshToken: user.refreshToken,
+    role: user.role,
+    department: user.department,
+  }));
+  return user;
 }
 
 export async function registerDepartmentAccount(email, password, department) {
